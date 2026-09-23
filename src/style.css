@@ -356,6 +356,8 @@ body.designing .page { padding-right: calc(min(430px, 100vw) + 24px); }
     box-shadow: 0 calc(var(--b) * -1) 0 0 var(--c);
   }
   body.designing .page { padding-right: clamp(16px, 3.2vw, 40px); padding-bottom: 64dvh; }
+  .d-foot { gap: 10px; padding: 12px 0 14px; }
+  .d-foot .btn { padding: 7px 11px; font-size: 15px; }
   .now { grid-template-columns: auto minmax(0, 1fr) auto; }
   .now-actions { grid-column: 1 / -1; justify-self: start; }
   .skin-name svg { height: 26px; }
