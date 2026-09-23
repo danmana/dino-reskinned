@@ -1,0 +1,22 @@
+{
+  "name": "dino-skins",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The Chrome offline dino runner, re-skinned: eleven pixel-art worlds plus a skin designer.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "sheet": "node scripts/sheet.ts",
+    "bench": "node scripts/botbench.ts",
+    "og": "node scripts/og.ts"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^26.6.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0"
+  }
+}
