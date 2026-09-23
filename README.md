@@ -50,7 +50,7 @@ Each role can be any skin's sprite, any emoji, or **your own picture**. Upload (
 | Flyer (facing left) | 26 × 20 |
 | Sky decoration | 40 × 16 |
 
-Pixel art at that size, or exported at a whole-number scale (2×, 8×, …), is copied pixel for pixel. Anything else, photos included, is scaled down, reduced to a small palette and outlined, with an optional background remover for pictures on a plain backdrop. **Download template** gives you the current sprite as an 8× PNG at the exact size to edit and upload back. Share links carry the pixelated results (at most 15 colours each), deflated, so a skin with five custom pictures still fits in a link of well under a couple of kilobytes.
+Pixel art at that size, or exported at a whole-number scale (2×, 8×, …), is copied pixel for pixel. Anything else, photos included, is scaled down, reduced to a small palette and outlined, with an optional background remover for pictures on a plain backdrop. **Download template** gives you the current sprite as an 8× PNG at the exact size to edit and upload back. Share links carry the pixelated results (at most 15 colours each), deflated: a skin with a busy photo in every slot comes to about 1.8 KB of link, and typical pixel art is far smaller.
 
 ## How it's built
 
