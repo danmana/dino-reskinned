@@ -2,7 +2,8 @@ import { PixelBuffer } from '../core/pixbuf.ts';
 import { contrast, hsl, lighten, luminance, mix } from '../core/color.ts';
 import { compileSkin, gridsToBuffers, mapSpriteBuffers, type ColorFn, type SkinArt, type SpriteBuffers } from '../render/compile.ts';
 import { flipV, padTo, rasterEmoji, stackV } from './emoji.ts';
-import type { CelestialKind, GenLayer, GroundStyle, LayerDef, LayerKind, SkinDef, SoundPreset, WeatherDef, WeatherKind } from './types.ts';
+import { decodePixels, flipH, resampleNearest } from './pixelate.ts';
+import { LIMITS, type CelestialKind, type GenLayer, type GroundStyle, type LayerDef, type LayerKind, type SkinDef, type SoundPreset, type WeatherDef, type WeatherKind } from './types.ts';
 
 // A custom skin is a short recipe: who plays each role (a preset's sprite or
 // any emoji), six colours, and a few world choices. It is small enough to
@@ -11,7 +12,25 @@ import type { CelestialKind, GenLayer, GroundStyle, LayerDef, LayerKind, SkinDef
 export type Role = 'runner' | 'small' | 'large' | 'flyer' | 'decor';
 export const ROLES: Role[] = ['runner', 'small', 'large', 'flyer', 'decor'];
 
-export type CastSource = { preset: string } | { emoji: string; flip?: boolean } | { none: true };
+/**
+ * `image` and `duck` hold pixelated pictures in the compact "WxH:palette:pixels"
+ * form from pixelate.ts, so a custom skin with uploads still fits in a link.
+ */
+export type CastSource =
+  | { preset: string }
+  | { emoji: string; flip?: boolean }
+  | { image: string; flip?: boolean; duck?: string }
+  | { none: true };
+
+/** Exact sprite boxes for uploaded pictures: the game's size limits for each role. */
+export const ROLE_BOX: Record<Role | 'duck', { w: number; h: number }> = {
+  runner: LIMITS.runner,
+  duck: LIMITS.duck,
+  small: LIMITS.small,
+  large: LIMITS.large,
+  flyer: LIMITS.flyer,
+  decor: LIMITS.decor,
+};
 
 export interface CustomSkin {
   v: 1;
@@ -110,6 +129,32 @@ function emojiBuffers(e: string, flip: boolean, role: Role): Partial<SpriteBuffe
   }
 }
 
+function imageBuffers(src: { image: string; flip?: boolean; duck?: string }, role: Role): Partial<SpriteBuffers> {
+  const box = ROLE_BOX[role];
+  const raw = decodePixels(src.image, box.w, box.h) ?? new PixelBuffer(1, 1);
+  const base = src.flip ? flipH(raw) : raw;
+  // Frames bob by a pixel when there is headroom inside the box.
+  const bob = base.h < box.h ? 1 : 0;
+  const frame = (dy: number) => padTo(base, base.w, base.h + bob, dy);
+  switch (role) {
+    case 'runner': {
+      const drawn = src.duck ? decodePixels(src.duck, ROLE_BOX.duck.w, ROLE_BOX.duck.h) : null;
+      const duck = drawn
+        ? (src.flip ? flipH(drawn) : drawn)
+        : resampleNearest(base, Math.min(ROLE_BOX.duck.w, Math.round(base.w * 1.25)), Math.min(ROLE_BOX.duck.h - 1, Math.max(4, Math.round(base.h * 0.5))));
+      return { run: [frame(bob), frame(0)], jump: frame(bob), dead: padTo(flipV(base), base.w, base.h + bob, bob), idle: [frame(bob)], duck: [duck, duck] };
+    }
+    case 'small':
+      return { small: [[base]] };
+    case 'large':
+      return { large: [[base]] };
+    case 'flyer':
+      return { flyer: [frame(bob), frame(0)] };
+    case 'decor':
+      return { decor: [base] };
+  }
+}
+
 function castBuffers(c: CustomSkin, presets: Map<string, SkinDef>): SpriteBuffers {
   const out: SpriteBuffers = { run: [], jump: new PixelBuffer(1, 1), duck: [], dead: new PixelBuffer(1, 1), idle: [], small: [], large: [], flyer: [], decor: [] };
   const recolor = c.inkCast ? inkFn(c.colors.ink, c.colors.skyBottom) : null;
@@ -118,6 +163,7 @@ function castBuffers(c: CustomSkin, presets: Map<string, SkinDef>): SpriteBuffer
     let part: Partial<SpriteBuffers>;
     if ('none' in src) continue;
     if ('emoji' in src) part = emojiBuffers(src.emoji, !!src.flip, role);
+    else if ('image' in src) part = imageBuffers(src, role);
     else {
       const all = presetBuffers(presets, src.preset);
       const pick: Record<Role, (keyof SpriteBuffers)[]> = { runner: ['run', 'jump', 'duck', 'dead', 'idle'], small: ['small'], large: ['large'], flyer: ['flyer'], decor: ['decor'] };
@@ -235,19 +281,31 @@ export function randomize(c: CustomSkin, presetIds: string[]): CustomSkin {
 
 // ---------------------------------------------------------------- sharing
 
-export function encodeSkin(c: CustomSkin): string {
-  const bytes = new TextEncoder().encode(JSON.stringify(c));
+const b64url = (bytes: Uint8Array) => {
   let bin = '';
   bytes.forEach((b) => (bin += String.fromCharCode(b)));
   return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+};
+const fromB64url = (s: string) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), (ch) => ch.charCodeAt(0));
+
+async function pipe(bytes: Uint8Array, stream: CompressionStream | DecompressionStream): Promise<Uint8Array> {
+  const out = new Blob([bytes as BlobPart]).stream().pipeThrough(stream);
+  return new Uint8Array(await new Response(out).arrayBuffer());
 }
 
-export function decodeSkin(s: string): CustomSkin | null {
+/** Share-link payload: "z" + deflated JSON when the browser can compress, else plain JSON. */
+export async function encodeSkin(c: CustomSkin): Promise<string> {
+  const json = new TextEncoder().encode(JSON.stringify(c));
+  if (typeof CompressionStream === 'undefined') return b64url(json);
+  return 'z' + b64url(await pipe(json, new CompressionStream('deflate-raw')));
+}
+
+export async function decodeSkin(s: string): Promise<CustomSkin | null> {
   try {
-    const bin = atob(s.replace(/-/g, '+').replace(/_/g, '/'));
-    const bytes = Uint8Array.from(bin, (ch) => ch.charCodeAt(0));
+    const bytes = s.startsWith('z') ? await pipe(fromB64url(s.slice(1)), new DecompressionStream('deflate-raw')) : fromB64url(s);
     const c = JSON.parse(new TextDecoder().decode(bytes)) as CustomSkin;
     if (c?.v !== 1 || !c.cast || !c.colors) return null;
+    c.name = String(c.name ?? '').slice(0, 22);
     return c;
   } catch {
     return null;

@@ -66,7 +66,7 @@ let imported: CustomSkin | null = null;
 {
   const m = location.hash.match(/skin=([A-Za-z0-9_-]+)/);
   if (m) {
-    const c = decodeSkin(m[1]);
+    const c = await decodeSkin(m[1]);
     if (c) {
       if (!customs.some((x) => x.id === c.id)) customs.push(c);
       store.set('dino.custom', customs);
@@ -307,9 +307,10 @@ const designer = new Designer($('designer'), {
     closeDesigner();
     setSkin(beforeId, false);
   },
-  shareUrl(c) {
-    return `${location.origin}${location.pathname}#skin=${encodeSkin({ ...c, name: c.name.trim() || 'Untitled skin' })}`;
+  async shareUrl(c) {
+    return `${location.origin}${location.pathname}#skin=${await encodeSkin({ ...c, name: c.name.trim() || 'Untitled skin' })}`;
   },
+  currentArt: () => game.art,
   toast,
 });
 
@@ -516,4 +517,11 @@ requestAnimationFrame((t) => {
 });
 
 // Debug handle for automated checks.
-(window as unknown as { __dino: unknown }).__dino = { game, setSkin, entries, get autoplay() { return autoplay; } };
+(window as unknown as { __dino: unknown }).__dino = {
+  game, setSkin, entries,
+  get autoplay() { return autoplay; },
+  shareLink: async (id: string) => {
+    const c = customs.find((x) => x.id === id);
+    return c ? `${location.origin}${location.pathname}#skin=${await encodeSkin(c)}` : null;
+  },
+};

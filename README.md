@@ -37,7 +37,20 @@ On phones: tap the game to jump, or use the Jump and Duck pads. Like the origina
 
 ## Skin designer
 
-Pick who plays each role (any skin's sprite, or any emoji, which gets pixelated and outlined), six colours, far and near scenery, ground, weather, what's in the sky and the sound set. The game keeps playing your skin on autoplay while you edit. Skins are saved in your browser, and **Copy link** puts the whole skin in a URL so anyone can play it.
+Pick who plays each role, six colours, far and near scenery, ground, weather, what's in the sky and the sound set. The game keeps playing your skin on autoplay while you edit. Skins are saved in your browser, and **Copy link** puts the whole skin in a URL so anyone can play it.
+
+Each role can be any skin's sprite, any emoji, or **your own picture**. Upload (or drop) any image and it's pixelated to the role's exact size, with a preview:
+
+| Role | Exact size (px) |
+|------|-----------------|
+| Runner (facing right) | 28 × 24 |
+| Duck pose (optional; otherwise squashed from the runner) | 32 × 12 |
+| Small obstacle | 11 × 18 |
+| Tall obstacle | 15 × 26 |
+| Flyer (facing left) | 26 × 20 |
+| Sky decoration | 40 × 16 |
+
+Pixel art at that size, or exported at a whole-number scale (2×, 8×, …), is copied pixel for pixel. Anything else, photos included, is scaled down, reduced to a small palette and outlined, with an optional background remover for pictures on a plain backdrop. **Download template** gives you the current sprite as an 8× PNG at the exact size to edit and upload back. Share links carry the pixelated results (at most 15 colours each), deflated, so a skin with five custom pictures still fits in a link of well under a couple of kilobytes.
 
 ## How it's built
 
