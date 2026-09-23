@@ -97,6 +97,64 @@ const PRESETS: Record<SoundPreset, Record<Sfx, Voice[]>> = {
   },
 };
 
+export function makeNoise(ctx: BaseAudioContext): AudioBuffer {
+  const len = Math.floor(ctx.sampleRate);
+  const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  return buf;
+}
+
+/** Schedules one game sound on any audio context (live or offline). */
+export function scheduleSfx(ctx: BaseAudioContext, dest: AudioNode, noise: AudioBuffer, sfx: Sfx, preset: SoundPreset, at: number): void {
+  for (const v of PRESETS[preset]?.[sfx] ?? PRESETS.chip[sfx]) voice(ctx, dest, noise, v, at);
+}
+
+function voice(ctx: BaseAudioContext, dest: AudioNode, noise: AudioBuffer, v: Voice, now: number): void {
+  const t0 = now + (v.at ?? 0);
+  const t1 = t0 + v.dur;
+  const g = ctx.createGain();
+  const peak = v.gain ?? 0.1;
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(peak, t0 + 0.008);
+  g.gain.exponentialRampToValueAtTime(0.0001, t1);
+  let out: AudioNode = g;
+  if (v.filter) {
+    const f = ctx.createBiquadFilter();
+    f.type = 'noise' in v ? 'bandpass' : 'lowpass';
+    f.frequency.setValueAtTime(v.filter, t0);
+    if ('noise' in v && v.sweep) f.frequency.exponentialRampToValueAtTime(v.sweep, t1);
+    if ('noise' in v && v.q) f.Q.value = v.q;
+    g.connect(f);
+    out = f;
+  }
+  out.connect(dest);
+  if ('noise' in v) {
+    const src = ctx.createBufferSource();
+    src.buffer = noise;
+    src.connect(g);
+    src.start(t0);
+    src.stop(t1 + 0.02);
+    return;
+  }
+  const osc = ctx.createOscillator();
+  osc.type = v.wave;
+  osc.frequency.setValueAtTime(v.f0, t0);
+  if (v.f1) osc.frequency.exponentialRampToValueAtTime(v.f1, t1);
+  if (v.vibrato) {
+    const lfo = ctx.createOscillator();
+    const depth = ctx.createGain();
+    lfo.frequency.value = v.vibrato[0];
+    depth.gain.value = v.vibrato[1];
+    lfo.connect(depth).connect(osc.frequency);
+    lfo.start(t0);
+    lfo.stop(t1 + 0.02);
+  }
+  osc.connect(g);
+  osc.start(t0);
+  osc.stop(t1 + 0.02);
+}
+
 export class Audio {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
@@ -112,63 +170,13 @@ export class Audio {
       this.master = this.ctx.createGain();
       this.master.gain.value = 0.9;
       this.master.connect(this.ctx.destination);
-      const len = Math.floor(this.ctx.sampleRate * 1);
-      this.noiseBuf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
-      const d = this.noiseBuf.getChannelData(0);
-      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      this.noiseBuf = makeNoise(this.ctx);
     }
     if (this.ctx.state === 'suspended') void this.ctx.resume();
   }
 
   play(sfx: Sfx, preset: SoundPreset): void {
-    if (this.muted || !this.ctx || !this.master || this.ctx.state !== 'running') return;
-    const now = this.ctx.currentTime + 0.005;
-    for (const v of PRESETS[preset]?.[sfx] ?? PRESETS.chip[sfx]) this.voice(v, now);
-  }
-
-  private voice(v: Voice, now: number): void {
-    const ctx = this.ctx!;
-    const t0 = now + (v.at ?? 0);
-    const t1 = t0 + v.dur;
-    const g = ctx.createGain();
-    const peak = v.gain ?? 0.1;
-    g.gain.setValueAtTime(0.0001, t0);
-    g.gain.exponentialRampToValueAtTime(peak, t0 + 0.008);
-    g.gain.exponentialRampToValueAtTime(0.0001, t1);
-    let out: AudioNode = g;
-    if (v.filter) {
-      const f = ctx.createBiquadFilter();
-      f.type = 'noise' in v ? 'bandpass' : 'lowpass';
-      f.frequency.setValueAtTime(v.filter, t0);
-      if ('noise' in v && v.sweep) f.frequency.exponentialRampToValueAtTime(v.sweep, t1);
-      if ('noise' in v && v.q) f.Q.value = v.q;
-      g.connect(f);
-      out = f;
-    }
-    out.connect(this.master!);
-    if ('noise' in v) {
-      const src = ctx.createBufferSource();
-      src.buffer = this.noiseBuf;
-      src.connect(g);
-      src.start(t0);
-      src.stop(t1 + 0.02);
-      return;
-    }
-    const osc = ctx.createOscillator();
-    osc.type = v.wave;
-    osc.frequency.setValueAtTime(v.f0, t0);
-    if (v.f1) osc.frequency.exponentialRampToValueAtTime(v.f1, t1);
-    if (v.vibrato) {
-      const lfo = ctx.createOscillator();
-      const depth = ctx.createGain();
-      lfo.frequency.value = v.vibrato[0];
-      depth.gain.value = v.vibrato[1];
-      lfo.connect(depth).connect(osc.frequency);
-      lfo.start(t0);
-      lfo.stop(t1 + 0.02);
-    }
-    osc.connect(g);
-    osc.start(t0);
-    osc.stop(t1 + 0.02);
+    if (this.muted || !this.ctx || !this.master || !this.noiseBuf || this.ctx.state !== 'running') return;
+    scheduleSfx(this.ctx, this.master, this.noiseBuf, sfx, preset, this.ctx.currentTime + 0.005);
   }
 }

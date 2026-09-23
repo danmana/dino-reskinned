@@ -153,14 +153,15 @@ export class Renderer {
     void color;
   }
 
-  frame(game: Game, view: SkinView, prev: SkinView | null, switchP: number, night: number, speed: number): void {
+  /** prevNight lets the outgoing skin keep its own night level during a switch (defaults to night). */
+  frame(game: Game, view: SkinView, prev: SkinView | null, switchP: number, night: number, speed: number, prevNight = night): void {
     for (const p of this.puffs) { p.x += p.vx - speed * 0.3; p.y += p.vy; p.vy += 0.03; p.life--; }
     this.puffs = this.puffs.filter((p) => p.life > 0);
 
     if (prev && switchP < 1) {
       const [a, actx] = this.pool[0];
       const [b, bctx] = this.pool[1];
-      this.variantScene(actx, game, prev, night);
+      this.variantScene(actx, game, prev, prevNight);
       this.variantScene(bctx, game, view, night);
       this.composite(this.ctx, a, b, this.thrSweep, switchP);
     } else {
