@@ -110,10 +110,14 @@ const human = {
   },
 };
 
+/** Dev-only: lets a capture script pause the real-time loop and step it itself. */
+const hooks = { held: false, onEvent: null as ((ev: string, preset: string) => void) | null };
+
 function tick(): void {
   const inp = autoplay || designing ? bot.decide(game) : human.consume();
   game.step(inp);
   for (const ev of game.events) {
+    hooks.onEvent?.(ev, game.art.sound);
     if (ev === 'jump') audio.play('jump', game.art.sound);
     else if (ev === 'score') audio.play('score', game.art.sound);
     else if (ev === 'land') renderer.puff(game.art.day.ink);
@@ -136,7 +140,17 @@ function tick(): void {
 
 let last = performance.now();
 let acc = 0;
+function render(): void {
+  const e = switchT * switchT * (3 - 2 * switchT);
+  renderer.frame(game, view, prevView, e, nightMix, game.state === 'running' ? game.speed : 0);
+}
+
 function frame(now: number): void {
+  if (hooks.held) {
+    last = now;
+    requestAnimationFrame(frame);
+    return;
+  }
   acc += Math.min(100, now - last);
   last = now;
   let steps = 0;
@@ -146,8 +160,7 @@ function frame(now: number): void {
     steps++;
   }
   if (steps === 6) acc = 0;
-  const e = switchT * switchT * (3 - 2 * switchT);
-  renderer.frame(game, view, prevView, e, nightMix, game.state === 'running' ? game.speed : 0);
+  render();
   requestAnimationFrame(frame);
 }
 
@@ -212,7 +225,8 @@ function applySkin(a: SkinArt, animate: boolean): void {
 }
 
 function setSkin(id: string, animate = true): void {
-  if (id === game.art.id && !designing) return;
+  // A saved draft is already on screen under its final id, so compare with currentId too.
+  if (id === currentId && id === game.art.id && !designing) return;
   currentId = id;
   store.set('dino.skin', id);
   const a = art(id);
@@ -524,4 +538,13 @@ requestAnimationFrame((t) => {
     const c = customs.find((x) => x.id === id);
     return c ? `${location.origin}${location.pathname}#skin=${await encodeSkin(c)}` : null;
   },
+  hooks,
+  /** Advances the game exactly one tick and draws it (used while hooks.held). */
+  step: () => {
+    tick();
+    render();
+  },
+  canvas,
 };
+
+if (import.meta.env.DEV && new URLSearchParams(location.search).has('capture')) void import('./demo-capture.ts');

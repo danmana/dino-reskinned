@@ -50,7 +50,7 @@ Each role can be any skin's sprite, any emoji, or **your own picture**. Upload (
 | Flyer (facing left) | 26 × 20 |
 | Sky decoration | 40 × 16 |
 
-Pixel art at that size, or exported at a whole-number scale (2×, 8×, …), is copied pixel for pixel. Anything else, photos included, is scaled down, reduced to a small palette and outlined, with an optional background remover for pictures on a plain backdrop. **Download template** gives you the current sprite as an 8× PNG at the exact size to edit and upload back. Share links carry the pixelated results (at most 15 colours each), deflated: a skin with a busy photo in every slot comes to about 1.8 KB of link, and typical pixel art is far smaller.
+Pixel art at that size, or exported at a whole-number scale (2×, 8×, …), is copied pixel for pixel. Anything else, photos included, is scaled down, reduced to a small palette and outlined, with an optional background remover for pictures on a plain backdrop. **Download template** gives you the current sprite as an 8× PNG at the exact size to edit and upload back. Share links carry the pixelated results (at most 15 colours each), deflated: a skin with an illustration in every slot, duck pose included, comes to about 2.3 KB of link, and small pixel art is far less.
 
 ## How it's built
 
@@ -69,6 +69,8 @@ npm run build                    # typecheck + production build
 node scripts/sheet.ts <skin-id>  # PNG preview of a skin (day, night, sprite sheet) + size/contrast checks
 node scripts/botbench.ts <skin-id> [runs]   # headless autoplay benchmark
 ```
+
+Video tooling (dev server only): `record.html?go` renders the frame-exact skin showcase, and `/?capture` plus `demo-compose.html?go` record and compose UI demos (screenshots per UI step, exact game frames laid over them, cursor and captions). Both send frames to `node scripts/record-server.ts <dir>` for ffmpeg.
 
 ### Adding a skin
 
