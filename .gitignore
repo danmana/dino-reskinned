@@ -3,3 +3,4 @@ dist
 .sheets
 .vercel
 .DS_Store
+.env*
