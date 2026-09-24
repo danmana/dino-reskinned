@@ -235,6 +235,8 @@ kbd {
 }
 .keys p { margin: 0; }
 .keys .credit { grid-column: 1 / -1; margin-top: 18px; font-size: 14px; }
+.keys .credit a { color: var(--fg); text-decoration: underline; text-underline-offset: 3px; }
+.keys .credit a:hover { color: var(--accent); }
 .touch-only { display: none; }
 @media (pointer: coarse) {
   .touch-only { display: block; }
