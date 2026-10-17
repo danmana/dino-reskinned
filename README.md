@@ -9,8 +9,8 @@ The Chrome offline dinosaur game, rebuilt from scratch in pixel art and dressed 
 | # | Skin | Runner | Obstacles | Flyer |
 |---|------|--------|-----------|-------|
 | 1 | Original | T-rex | cacti | pterodactyl |
-| 2 | Roadster | the new Tesla Roadster, on cold-gas thrusters (suction fans to duck) | parked Teslas, the Semi, Optimus | Starlink satellite |
-| 3 | Wild West | cowboy on a galloping horse | tumbleweeds, barrels, saguaros | eagle |
+| 2 | Wild West | cowboy on a galloping horse | tumbleweeds, barrels, saguaros | eagle |
+| 3 | Roadster | the new Tesla Roadster, on cold-gas thrusters (suction fans to duck) | parked Teslas, the Semi, Optimus | Starlink satellite |
 | 4 | Tokyo Lights | rider on a neon motorbike | cones, barriers, vending machines | drone |
 | 5 | Deep Sea | crab | urchins, clams, coral, anchors | shark |
 | 6 | Goat Mode | goat, tongue out | gnomes, gas cans, hay bales | a flung goat |
