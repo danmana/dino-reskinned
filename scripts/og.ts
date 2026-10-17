@@ -57,7 +57,7 @@ drawText(title, 'DINO', 0, 2, '#535353');
 drawText(title, 'RESKINNED', textWidth('DINO') + 6, 2, '#9a9a9a');
 const sub = new PixelBuffer(300, 10);
 sub.fill(pack('#f7f7f7'));
-drawText(sub, 'ELEVEN WORLDS. SWITCH MID-RUN. MAKE YOUR OWN.', 0, 1, '#7a7a7a');
+drawText(sub, 'TWELVE WORLDS. SWITCH MID-RUN. MAKE YOUR OWN.', 0, 1, '#7a7a7a');
 const blitScaled = (src: PixelBuffer, k: number, ox: number, oy: number) => {
   for (let y = 0; y < src.h * k; y++) for (let x = 0; x < src.w * k; x++) {
     const tx = ox + x, ty = oy + y;

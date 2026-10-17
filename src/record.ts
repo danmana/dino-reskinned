@@ -62,6 +62,8 @@ interface Seg {
   title: string;
   tagline: string;
   counter?: string;
+  /** Replaces the header's "switch skins" hint and its keycap. */
+  hint?: string;
 }
 
 function storyboard(): Seg[] {
@@ -77,7 +79,7 @@ function storyboard(): Seg[] {
   const polar = segs.find((s) => s.art.id === 'polar');
   if (polar) polar.night = true;
   segs.push({ art: buildCustomArt(frog, presetMap), frames: 170, title: 'Make your own', tagline: 'Any emoji or sprite, six colours and a world. About a minute.' });
-  segs.push({ art: art('original'), frames: 170, title: 'dino-reskinned.vercel.app', tagline: 'Eleven worlds. Switch mid-run. Make your own.' });
+  segs.push({ art: art('original'), frames: 170, title: 'dino-reskinned.vercel.app', tagline: 'Twelve worlds. Switch mid-run. Make your own.' });
   return segs;
 }
 
@@ -137,10 +139,10 @@ function drawFrame(ctx: CanvasRenderingContext2D, game: HTMLCanvasElement, seg: 
   ctx.fillRect(0, 0, VW, VH);
   bitmap(ctx, 'DINO', M, 62, 6, t.fg);
   bitmap(ctx, 'RESKINNED', M + textWidth('DINO') * 6 + 30, 62 + 21, 3, t.muted);
-  const hint = 'SWITCH SKINS MID-RUN';
+  const hint = seg.hint ?? 'SWITCH SKINS MID-RUN';
   const hintW = textWidth(hint) * 3;
   bitmap(ctx, hint, VW - M - hintW, 74, 3, t.muted);
-  keycap(ctx, VW - M - hintW - 26 - 13 * 5, 50, 5, t.fg, t.face, keyDown);
+  if (!seg.hint) keycap(ctx, VW - M - hintW - 26 - 13 * 5, 50, 5, t.fg, t.face, keyDown);
   ctx.drawImage(game, 0, GAME_Y, VW, H * K);
   bitmap(ctx, seg.title.toUpperCase(), M, 836, 10, t.fg);
   ctx.font = '500 40px "Pixelify Sans"';
@@ -307,4 +309,135 @@ async function record(): Promise<void> {
   log(`done: ${rec.total} frames, ${events.length} sounds`);
 }
 
-if (new URLSearchParams(location.search).has('go')) void record().catch((e) => { rec.status = `error: ${e}`; log(String(e)); });
+// ---------------------------------------------------------------- roadster clip
+// A single-skin clip: the Roadster hovers at the start line, launches, jumps
+// the line-up, ducks the satellites, the stage lights go down, and it finally
+// flips. /record.html?go&clip=roadster
+
+const NONE = { jump: false, jumpPressed: false, down: false, downPressed: false };
+const CLIP = {
+  ready: 80, // frames on the start line
+  ramp: 50, // launch: frames to reach top speed
+  rampTo: 5.4,
+  nightAt: 900,
+  letGo: 1330, // the bot stops driving here
+  overHold: 110,
+  endCard: 150,
+};
+
+interface ClipRun {
+  ok: boolean;
+  crashAt: number;
+  ducks: number[];
+}
+
+/** One deterministic clip run, a frame at a time; the return value says how it went. */
+function* clipFrames(a: SkinArt, seed: number): Generator<{ game: Game; f: number }, ClipRun> {
+  const game = new Game(a);
+  game.rand = rng(seed);
+  game.worldW = W;
+  game.tick = 229 - 50; // the idle hover plays 50 frames in
+  const bot = new Bot();
+  const ducks: number[] = [];
+  let wasDuck = false;
+  let crashAt = -1;
+  for (let f = 0; f < (crashAt < 0 ? CLIP.letGo + 200 : crashAt + CLIP.overHold + CLIP.endCard); f++) {
+    if (crashAt < 0) {
+      if (f < CLIP.ready) game.step(NONE);
+      else if (f === CLIP.ready) game.step({ ...NONE, jump: true, jumpPressed: true });
+      else {
+        // The launch: top speed in under a second, then the game's own acceleration.
+        const k = f - CLIP.ready - 1;
+        if (k < CLIP.ramp) game.speed = 3 + (CLIP.rampTo - 3) * ((k + 1) / CLIP.ramp);
+        game.step(f < CLIP.letGo ? bot.decide(game) : NONE);
+      }
+      if (game.state === 'over') {
+        if (f < CLIP.letGo) return { ok: false, crashAt: f, ducks };
+        crashAt = f;
+      }
+      const duck = game.runner.ducking && !game.runner.air;
+      if (duck && !wasDuck) ducks.push(f);
+      wasDuck = duck;
+      if (crashAt < 0 && f > CLIP.letGo + 150) return { ok: false, crashAt, ducks };
+    } else game.step(NONE);
+    yield { game, f };
+  }
+  return { ok: true, crashAt, ducks };
+}
+
+function clipRun(a: SkinArt, seed: number): ClipRun {
+  const it = clipFrames(a, seed);
+  for (;;) {
+    const r = it.next();
+    if (r.done) return r.value;
+  }
+}
+
+async function recordClip(): Promise<void> {
+  await document.fonts.load('500 40px "Pixelify Sans"');
+  const a = art('roadster');
+  let seed = 1;
+  let run = clipRun(a, seed);
+  // A run that ducks at least twice, first after the thruster caption, and crashes soon after the bot lets go.
+  while (!(run.ok && run.ducks.length >= 2 && run.ducks[0] > 480 && run.ducks[0] < 820 && run.crashAt < CLIP.letGo + 80)) run = clipRun(a, ++seed);
+  const total = run.crashAt + CLIP.overHold + CLIP.endCard;
+  rec.total = total;
+  rec.seed = seed;
+  log(`seed ${seed}, ducks at ${run.ducks.join(', ')}, crash at ${run.crashAt}, ${total} frames (${(total / FPS).toFixed(1)} s)`);
+
+  const duckFrom = run.ducks[0] - 40;
+  const caption = (f: number): Pick<Seg, 'title' | 'tagline'> => {
+    if (f >= run.crashAt + CLIP.overHold) return { title: 'dino-reskinned.vercel.app', tagline: 'Twelve worlds. Switch mid-run. Make your own.' };
+    if (f >= run.crashAt) return { title: 'Roadster', tagline: 'Landing not included.' };
+    if (f >= CLIP.nightAt) return { title: 'Roadster', tagline: 'Lights down, like the unveiling.' };
+    if (f >= duckFrom) return { title: 'Roadster', tagline: 'Suction fans pull it flat to duck the Starlinks.' };
+    if (f >= CLIP.ready + 150) return { title: 'Roadster', tagline: 'Cold-gas thrusters to jump the line-up.' };
+    if (f >= CLIP.ready) return { title: 'Roadster', tagline: '0-60 in under a second.' };
+    return { title: 'Roadster', tagline: 'A new skin for Dino, Reskinned.' };
+  };
+
+  const gameCanvas = document.createElement('canvas');
+  const renderer = new Renderer(gameCanvas);
+  renderer.resize(W);
+  const view = new SkinView(a, W);
+  const out = document.getElementById('v') as HTMLCanvasElement;
+  out.width = VW;
+  out.height = VH;
+  const octx = out.getContext('2d')!;
+  const events: { t: number; sfx: Sfx; preset: SoundPreset }[] = [];
+  const inflight = new Set<Promise<unknown>>();
+  let night = 0;
+  rec.status = 'recording';
+
+  // Re-run the same simulation, rendering and posting each frame as it comes.
+  for (const { game, f } of clipFrames(a, seed)) {
+    if (f >= CLIP.nightAt) night = Math.min(1, night + 1 / 50);
+    for (const ev of game.events) {
+      if (ev === 'jump' || ev === 'score' || ev === 'crash') events.push({ t: f / FPS, sfx: ev, preset: a.sound });
+      else if (ev === 'land') renderer.puff(a.day.ink);
+    }
+    game.events.length = 0;
+    const speed = game.state === 'running' ? game.speed : 0;
+    view.update(speed, W, night);
+    renderer.frame(game, view, null, 1, night, speed);
+    drawFrame(octx, gameCanvas, { art: a, frames: 0, ...caption(f), hint: 'NEW SKIN' }, themeOf(a), false);
+    const blob = await new Promise<Blob>((res) => out.toBlob((b) => res(b!), 'image/png'));
+    const p = fetch(`${SERVER}/frame/${f}`, { method: 'POST', body: blob }).finally(() => inflight.delete(p));
+    inflight.add(p);
+    if (inflight.size >= 6) await Promise.race(inflight);
+    rec.frame = f + 1;
+  }
+  await Promise.all(inflight);
+  log('rendering audio');
+  const audio = await renderAudio(events, total / FPS + 0.6);
+  await fetch(`${SERVER}/audio`, { method: 'POST', body: audio });
+  await fetch(`${SERVER}/done`, { method: 'POST', body: JSON.stringify({ frames: total, fps: FPS, seed, sounds: events.length }) });
+  rec.status = 'done';
+  log(`done: ${total} frames, ${events.length} sounds`);
+}
+
+const params = new URLSearchParams(location.search);
+if (params.has('go')) {
+  const run = params.get('clip') === 'roadster' ? recordClip : record;
+  void run().catch((e) => { rec.status = `error: ${e}`; log(String(e)); });
+}

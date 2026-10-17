@@ -10,6 +10,7 @@ import { moon } from './moon.ts';
 import { graveyard } from './graveyard.ts';
 import { sugar } from './sugar.ts';
 import { rushhour } from './rushhour.ts';
+import { roadster } from './roadster.ts';
 
 /** Preset order is the rail order and the 1–0 number-key order. */
-export const PRESETS: SkinDef[] = [original, wildwest, tokyo, deepsea, goat, dragons, polar, moon, graveyard, sugar, rushhour];
+export const PRESETS: SkinDef[] = [original, roadster, wildwest, tokyo, deepsea, goat, dragons, polar, moon, graveyard, sugar, rushhour];

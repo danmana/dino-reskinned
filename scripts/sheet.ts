@@ -43,10 +43,11 @@ const checkSize = (name: string, s: SpriteArt, lim: { w: number; h: number }) =>
   if (w > lim.w || h > lim.h) problems.push(`${name}: ${w}x${h} exceeds ${lim.w}x${lim.h}`);
 };
 const d = art.day;
-d.runner.run.forEach((s, i) => checkSize(`runner.run[${i}]`, s, LIMITS.runner));
-checkSize('runner.jump', d.runner.jump, LIMITS.runner);
-checkSize('runner.dead', d.runner.dead, LIMITS.runner);
-d.runner.duck.forEach((s, i) => checkSize(`runner.duck[${i}]`, s, LIMITS.duck));
+const lim = { ...LIMITS, ...def.limits };
+d.runner.run.forEach((s, i) => checkSize(`runner.run[${i}]`, s, lim.runner));
+checkSize('runner.jump', d.runner.jump, lim.runner);
+checkSize('runner.dead', d.runner.dead, lim.runner);
+d.runner.duck.forEach((s, i) => checkSize(`runner.duck[${i}]`, s, lim.duck));
 d.small.forEach((v, i) => v.forEach((s, j) => checkSize(`small[${i}][${j}]`, s, LIMITS.small)));
 d.large.forEach((v, i) => v.forEach((s, j) => checkSize(`large[${i}][${j}]`, s, LIMITS.large)));
 d.flyer.forEach((s, i) => checkSize(`flyer[${i}]`, s, LIMITS.flyer));

@@ -34,6 +34,20 @@ export interface VariantArt {
   weather?: WeatherDef;
   aurora?: [string, string];
   ink: string;
+  jets?: JetsArt;
+}
+
+/** A skin's jets with its palette characters resolved to this variant's colours. */
+export interface JetsArt {
+  lift: number[];
+  rise: number;
+  boost?: number;
+  hover?: number;
+  jet: [string, string, string];
+  smoke: [string, string];
+  /** Smoke opacity: thinner over the dark night stage. */
+  smokeAlpha: number;
+  dust?: string;
 }
 
 export interface SkinArt {
@@ -209,7 +223,8 @@ export function compileSkin(def: SkinDef, opts: CompileOptions = {}): SkinArt {
       const g: GenLayer = { ...l, color: col(l.color), accent: l.accent && (l.glow ? l.accent : col(l.accent)), seed: l.seed ?? seed + i };
       return { buf: renderLayer(g), baseline: l.baseline ?? 78, speed: l.speed };
     });
-    const ground = renderGround({ ...def.ground, color: col(def.ground.color), line: col(def.ground.line), detail: col(def.ground.detail) }, seed);
+    const nightGround = isNight && night.mode === 'tint' ? night.ground : undefined;
+    const ground = renderGround(nightGround ?? { ...def.ground, color: col(def.ground.color), line: col(def.ground.line), detail: col(def.ground.detail) }, seed);
 
     let sky = def.sky;
     let stars: string | undefined = def.stars;
@@ -244,7 +259,7 @@ export function compileSkin(def: SkinDef, opts: CompileOptions = {}): SkinArt {
       small: s.small.map(group),
       large: s.large.map(group),
       flyer: group(s.flyer),
-      decor: s.decor.map((b) => group([b])[0]),
+      decor: (isNight && night.mode === 'tint' && night.decor ? night.decor.map((g, i) => gridToBuffer(g, pal, `night.decor[${i}]`)) : s.decor).map((b) => group([b])[0]),
       layers,
       ground,
       sky,
@@ -253,6 +268,16 @@ export function compileSkin(def: SkinDef, opts: CompileOptions = {}): SkinArt {
       weather,
       aurora,
       ink,
+      jets: def.jets && {
+        lift: def.jets.lift ?? [],
+        rise: def.jets.rise ?? 0,
+        boost: def.jets.boost,
+        hover: def.jets.hover,
+        jet: [pal[def.jets.jet[0]], pal[def.jets.jet[1]], pal[def.jets.jet[2]]],
+        smoke: [pal[def.jets.smoke[0]], pal[def.jets.smoke[1]]],
+        smokeAlpha: isNight ? 0.7 : 0.85,
+        dust: def.jets.dust && pal[def.jets.dust],
+      },
     };
   };
 

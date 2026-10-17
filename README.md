@@ -1,6 +1,6 @@
 # Dino, Reskinned
 
-The Chrome offline dinosaur game, rebuilt from scratch in pixel art and dressed in eleven worlds. Switch skins mid-run with the arrow keys, let autoplay drive, or make your own skin in a minute.
+The Chrome offline dinosaur game, rebuilt from scratch in pixel art and dressed in twelve worlds. Switch skins mid-run with the arrow keys, let autoplay drive, or make your own skin in a minute.
 
 **Play:** https://dino-reskinned.vercel.app
 
@@ -9,16 +9,17 @@ The Chrome offline dinosaur game, rebuilt from scratch in pixel art and dressed 
 | # | Skin | Runner | Obstacles | Flyer |
 |---|------|--------|-----------|-------|
 | 1 | Original | T-rex | cacti | pterodactyl |
-| 2 | Wild West | cowboy on a galloping horse | tumbleweeds, barrels, saguaros | eagle |
-| 3 | Tokyo Lights | rider on a neon motorbike | cones, barriers, vending machines | drone |
-| 4 | Deep Sea | crab | urchins, clams, coral, anchors | shark |
-| 5 | Goat Mode | goat, tongue out | gnomes, gas cans, hay bales | a flung goat |
-| 6 | Fire & Blood | knight in a red cape | stakes, braziers, barricades | dragon |
-| 7 | Polar Night | penguin (belly-slides to duck) | ice shards, snowmen | snowy owl |
-| 8 | Moonwalk | astronaut | moon rocks, landers, antennas | UFO |
-| 9 | Graveyard Shift | skeleton | tombstones, pumpkins, coffins | bat |
-| 10 | Sugar Rush | gingerbread man | gumdrops, cupcakes, candy canes | winged donut |
-| 11 | Rush Hour | office worker with coffee | hydrants, bins, mailboxes | pigeon |
+| 2 | Roadster | the new Tesla Roadster, on cold-gas thrusters (suction fans to duck) | parked Teslas, the Semi, Optimus | Starlink satellite |
+| 3 | Wild West | cowboy on a galloping horse | tumbleweeds, barrels, saguaros | eagle |
+| 4 | Tokyo Lights | rider on a neon motorbike | cones, barriers, vending machines | drone |
+| 5 | Deep Sea | crab | urchins, clams, coral, anchors | shark |
+| 6 | Goat Mode | goat, tongue out | gnomes, gas cans, hay bales | a flung goat |
+| 7 | Fire & Blood | knight in a red cape | stakes, braziers, barricades | dragon |
+| 8 | Polar Night | penguin (belly-slides to duck) | ice shards, snowmen | snowy owl |
+| 9 | Moonwalk | astronaut | moon rocks, landers, antennas | UFO |
+| 10 | Graveyard Shift | skeleton | tombstones, pumpkins, coffins | bat |
+| 11 | Sugar Rush | gingerbread man | gumdrops, cupcakes, candy canes | winged donut |
+| 12 | Rush Hour | office worker with coffee | hydrants, bins, mailboxes | pigeon |
 
 Every skin keeps the original game loop: the same physics, spawn rules, gaps, speed curve, night mode every 700 points and score milestones every 100. Only the art, scenery, weather and sounds change, so switching mid-run is fair.
 
@@ -29,7 +30,7 @@ Every skin keeps the original game loop: the same physics, spawn rules, gaps, sp
 | Space / ↑ / W | Jump (hold for a higher jump) |
 | ↓ / S | Duck, or drop fast mid-air |
 | ← → or [ ] | Previous / next skin, mid-run |
-| 1 – 0 | Pick a skin |
+| 1 – 0 | Pick a skin (the first ten) |
 | A | Autoplay on or off (any jump key takes over) |
 | M | Sound on or off |
 
@@ -70,7 +71,7 @@ node scripts/sheet.ts <skin-id>  # PNG preview of a skin (day, night, sprite she
 node scripts/botbench.ts <skin-id> [runs]   # headless autoplay benchmark
 ```
 
-Video tooling (dev server only): `record.html?go` renders the frame-exact skin showcase, and `/?capture` plus `demo-compose.html?go` record and compose UI demos (screenshots per UI step, exact game frames laid over them, cursor and captions). Both send frames to `node scripts/record-server.ts <dir>` for ffmpeg.
+Video tooling (dev server only): `record.html?go` renders the frame-exact skin showcase (`record.html?go&clip=roadster` renders the single-skin Roadster clip), and `/?capture` plus `demo-compose.html?go` record and compose UI demos (screenshots per UI step, exact game frames laid over them, cursor and captions). Both send frames to `node scripts/record-server.ts <dir>` for ffmpeg.
 
 ### Adding a skin
 

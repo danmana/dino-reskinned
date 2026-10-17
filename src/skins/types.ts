@@ -155,6 +155,24 @@ export interface DecorDef {
   every: [number, number];
 }
 
+/** Gas jets drawn around the runner (thrusters, fans). Purely visual: they never collide. */
+export interface JetsDef {
+  /** Nozzles under the runner that fire while it rises: x offsets from the sprite's left edge. */
+  lift?: number[];
+  /** Height of the lift nozzles above the runner's lowest pixel. */
+  rise?: number;
+  /** A rear thruster fires for the launch, at this height above the runner's lowest pixel. */
+  boost?: number;
+  /** Idle frames after the first show the runner hovering this many px up, on its lift jets. */
+  hover?: number;
+  /** Three palette characters for the jets: core, body, edge. */
+  jet: [string, string, string];
+  /** Two palette characters for the smoke: body, shade. */
+  smoke: [string, string];
+  /** Palette character for dust pulled in under the runner while it ducks. Omit for none. */
+  dust?: string;
+}
+
 export type NightDef =
   /** The original's night mode: the whole palette flips. */
   | { mode: 'invert' }
@@ -173,6 +191,10 @@ export type NightDef =
       celestial?: CelestialDef | null;
       /** Replaces the day weather. null = none at night. */
       weather?: WeatherDef | null;
+      /** Replaces the ground at night, colours used as given (an LED strip, a lit floor). */
+      ground?: GroundDef;
+      /** Replaces the decor sprites at night, index for index; a blank grid (['.']) hides one. */
+      decor?: Grid[];
       /** Northern-lights ribbon colours. */
       aurora?: [string, string];
       /** HUD colour at night. */
@@ -221,6 +243,12 @@ export interface SkinDef {
   /** Two flap frames. The flyer faces left (it flies toward the runner). */
   flyer: Grid[];
   decor?: DecorDef;
+  jets?: JetsDef;
+  /**
+   * Wider runner or duck limits than LIMITS, for a long runner such as a car.
+   * A longer runner is harder to clear obstacles with: check it with botbench.
+   */
+  limits?: { runner?: { w: number; h: number }; duck?: { w: number; h: number } };
 
   sky: { top: string; bottom: string };
   /** Star colour in the daytime sky too (space, perpetual-night cities). Omit for none. */

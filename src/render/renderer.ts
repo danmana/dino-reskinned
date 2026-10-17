@@ -104,6 +104,26 @@ interface Puff {
   life: number;
 }
 
+/** A smoke puff that grows from r0 to r1 over its life and dithers out at the end. */
+interface Smoke extends Puff {
+  max: number;
+  r0: number;
+  r1: number;
+  /** 0 = thruster smoke, 1 = fan dust */
+  k: 0 | 1;
+}
+
+/** A thruster flame for one tick: from the nozzle at (x, y), `len` px long. */
+/** How far below the nozzle a thruster jet stays visible, in px. */
+const JET_REACH = 22;
+
+interface Cone {
+  x: number;
+  y: number;
+  len: number;
+  dir: 'down' | 'left';
+}
+
 export class Renderer {
   readonly canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
@@ -118,6 +138,12 @@ export class Renderer {
   private thrSweep!: Uint8Array;
   private restart = new Map<string, HTMLCanvasElement>();
   private puffs: Puff[] = [];
+  private smoke: Smoke[] = [];
+  private cones: Cone[] = [];
+  private jetTick = -1;
+  private wasAir = false;
+  private wasState = '';
+  private boostT = 0;
   touchHint = false;
 
   constructor(canvas: HTMLCanvasElement) {
@@ -157,6 +183,7 @@ export class Renderer {
   frame(game: Game, view: SkinView, prev: SkinView | null, switchP: number, night: number, speed: number, prevNight = night): void {
     for (const p of this.puffs) { p.x += p.vx - speed * 0.3; p.y += p.vy; p.vy += 0.03; p.life--; }
     this.puffs = this.puffs.filter((p) => p.life > 0);
+    this.stepJets(game, view, speed);
 
     if (prev && switchP < 1) {
       const [a, actx] = this.pool[0];
@@ -167,6 +194,140 @@ export class Renderer {
     } else {
       this.variantScene(this.ctx, game, view, night);
     }
+  }
+
+  /**
+   * Thruster flames, their smoke, and fan dust: advanced once per game tick,
+   * never part of a collision mask. Flames are cones under the nozzles; where
+   * one reaches the road its smoke rolls out sideways along the ground.
+   */
+  private stepJets(game: Game, view: SkinView, speed: number): void {
+    if (game.tick === this.jetTick) return;
+    this.jetTick = game.tick;
+    for (const p of this.smoke) {
+      p.x += p.vx - speed;
+      p.y = Math.min(GROUND_Y - 1, p.y + p.vy);
+      p.vx *= 0.93;
+      p.vy *= 0.92;
+      p.life--;
+    }
+    this.smoke = this.smoke.filter((p) => p.life > 0 && p.x > -12);
+    this.cones = [];
+
+    const j = view.art.day.jets;
+    const r = game.runner;
+    const running = game.state === 'running';
+    if (running && this.wasState === 'ready') this.boostT = 40;
+    this.wasState = game.state;
+    if (!j) return;
+    const rnd = Math.random;
+    const puff = (x: number, y: number, vx: number, vy: number, r0: number, r1: number, life: number, k: 0 | 1 = 0) =>
+      this.smoke.push({ x, y, vx, vy, r0, r1, life, max: life, k });
+
+    // Lift jets fire on take-off and while climbing, and on the idle hover.
+    const hovering = game.state === 'ready' && j.hover !== undefined && runnerSprite(game, view.art) !== view.art.day.runner.idle[0];
+    const burst = running && r.air && !this.wasAir;
+    const firing = hovering || (running && r.air && (burst || r.vy > 0.3));
+    if (firing) {
+      // Each jet is a column fixed under its nozzle, pointing straight down. It fades out about
+      // JET_REACH px below the car; smoke builds up on the road only when the jets reach it.
+      const top = GROUND_Y - r.ry - (hovering ? j.hover! : 0) - j.rise;
+      const reaches = top + JET_REACH >= GROUND_Y;
+      const fill = Math.max(1, Math.ceil(speed / 2));
+      for (const nx of j.lift) {
+        const x = RUNNER_X + nx;
+        this.cones.push({ x, y: top, len: Math.min(GROUND_Y - top, JET_REACH + 4), dir: 'down' });
+        if (!reaches) continue;
+        for (let i = 0; i < (burst ? 5 : 1) * fill; i++) {
+          if (!burst && rnd() < 0.35) continue;
+          const side = rnd() < 0.5 ? -1 : 1;
+          puff(x + side * rnd() * 2 + (i % fill) * (speed / fill), GROUND_Y - 1 - rnd() * 1.5, side * (0.4 + rnd() * 1.6), -0.25 - rnd() * 0.45, 1.5, 2.5 + rnd() * 4, 18 + rnd() * 12);
+        }
+      }
+    }
+    // The rear thruster fires for the launch.
+    if (running && this.boostT > 0 && j.boost !== undefined) {
+      this.boostT--;
+      const y = GROUND_Y - r.ry - j.boost;
+      const len = 10 + rnd() * 4 + Math.min(8, this.boostT / 4);
+      this.cones.push({ x: RUNNER_X - 1, y, len, dir: 'left' });
+      puff(RUNNER_X - 1 - len, y + (rnd() - 0.5) * 2, -0.6 - rnd() * 0.8, (rnd() - 0.4) * 0.3, 1, 3 + rnd() * 2.5, 22 + rnd() * 14);
+    }
+    // Ducking: the fans pull road dust in under the skirt.
+    if (j.dust && running && r.ducking && !r.air && game.tick % 2 === 0) {
+      const w = runnerSprite(game, view.art).w;
+      const side = rnd() < 0.5 ? -1 : 1;
+      const x = RUNNER_X + w / 2 + side * (w / 2 + 2 + rnd() * 8);
+      puff(x, GROUND_Y - rnd() * 2, speed - side * (1 + rnd() * 0.6), -0.05, 0.5, 0.5, 9, 1);
+    }
+    this.wasAir = r.air;
+  }
+
+  private drawJets(ctx: CanvasRenderingContext2D, v: VariantArt): void {
+    const j = v.jets;
+    if (!j || (!this.smoke.length && !this.cones.length)) return;
+    // Paths per colour and opacity step; a path paints each pixel once however many puffs cover it.
+    const LEVELS = [1, 0.7, 0.45, 0.22];
+    const paths = () => LEVELS.map(() => new Path2D());
+    const fillAll = (ps: Path2D[], color: string, alpha: number) => {
+      ctx.fillStyle = color;
+      ps.forEach((p, i) => { ctx.globalAlpha = alpha * LEVELS[i]; ctx.fill(p); });
+    };
+    // Smoke: each pixel takes the most opaque puff covering it; the top edge of the cloud is shaded.
+    const px = new Map<number, number>();
+    const dust = new Path2D();
+    for (const p of this.smoke) {
+      if (p.k === 1) { dust.rect(Math.round(p.x), Math.round(p.y), 1, 1); continue; }
+      const t = 1 - p.life / p.max;
+      const rad = p.r0 + (p.r1 - p.r0) * (1 - (1 - t) * (1 - t));
+      const level = t < 0.45 ? 0 : Math.min(3, 1 + Math.floor(((t - 0.45) / 0.55) * 3));
+      const cx = Math.round(p.x), cy = Math.round(p.y);
+      const n = Math.ceil(rad);
+      for (let dy = -n; dy <= n; dy++) for (let dx = -n; dx <= n; dx++) {
+        const x = cx + dx, y = cy + dy;
+        if (Math.hypot(dx, dy) > rad || y > GROUND_Y || x < 0 || x >= this.W) continue;
+        const k = y * this.W + x;
+        const had = px.get(k);
+        if (had === undefined || level < had) px.set(k, level);
+      }
+    }
+    const body = paths(), shade = paths();
+    for (const [k, level] of px) {
+      const x = k % this.W, y = (k - x) / this.W;
+      (px.has(k - this.W) ? body : shade)[level].rect(x, y, 1, 1);
+    }
+    fillAll(body, j.smoke[0], j.smokeAlpha);
+    fillAll(shade, j.smoke[1], j.smokeAlpha);
+    ctx.globalAlpha = 1;
+    if (j.dust) {
+      ctx.fillStyle = j.dust;
+      ctx.fill(dust);
+    }
+    // Jets over their smoke: densest and brightest at the nozzle, a narrow cone that flares a
+    // little as it falls and fades smoothly to nothing. A solid edge near the nozzle outlines it
+    // on a white sky. Each row is filled at its own opacity.
+    for (const c of this.cones) {
+      const reach = Math.min(c.len, JET_REACH);
+      const len = Math.min(c.len, reach + 4);
+      for (let d = 0; d < len; d++) {
+        const hw = 0.9 + d * 0.12;
+        const alpha = 1 - d / len;
+        const row = [new Path2D(), new Path2D(), new Path2D()]; // core, body, edge
+        const n = Math.ceil(hw);
+        for (let o = -n; o <= n; o++) {
+          const a = Math.abs(o);
+          if (a > hw) continue;
+          const x = c.dir === 'down' ? Math.round(c.x + o) : Math.round(c.x - d);
+          const y = c.dir === 'down' ? Math.round(c.y + d) : Math.round(c.y + o);
+          const rim = a > hw - 0.7;
+          if (rim && d >= 4 && bayer(x, y) < 0.5) continue;
+          row[d < 8 && a <= hw - 1 ? 0 : rim && d < 4 ? 2 : 1].rect(x, y, 1, 1);
+        }
+        ctx.globalAlpha = alpha;
+        [2, 1, 0].forEach((i) => { ctx.fillStyle = j.jet[i]; ctx.fill(row[i]); });
+      }
+    }
+    ctx.globalAlpha = 1;
   }
 
   private variantScene(ctx: CanvasRenderingContext2D, game: Game, view: SkinView, night: number): void {
@@ -255,6 +416,7 @@ export class Renderer {
     if (weather?.behind) weather.draw(ctx, W);
 
     for (const p of obstacles) ctx.drawImage(toCanvas(p.s.buf), p.x, p.y);
+    this.drawJets(ctx, v);
     ctx.drawImage(toCanvas(runner.buf), RUNNER_X, ry);
 
     if (this.puffs.length) {
