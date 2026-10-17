@@ -36,6 +36,8 @@ Every skin keeps the original game loop: the same physics, spawn rules, gaps, sp
 
 On phones: tap the game to jump, or use the Jump and Duck pads. Like the original, touch play leaves out the mid-height flyer lane.
 
+The address bar always links to the skin you're playing, for example `dino-reskinned.vercel.app/?skin=roadster`, and **Share** copies that link. A custom skin's link carries the whole skin, so it works for anyone.
+
 ## Skin designer
 
 Pick who plays each role, six colours, far and near scenery, ground, weather, what's in the sky and the sound set. The game keeps playing your skin on autoplay while you edit. Skins are saved in your browser, and **Copy link** puts the whole skin in a URL so anyone can play it.

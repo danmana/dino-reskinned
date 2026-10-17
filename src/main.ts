@@ -63,12 +63,14 @@ function art(id: string): SkinArt {
 
 // Shared links carry a whole custom skin in the hash.
 let imported: CustomSkin | null = null;
+let importedNew = false;
 {
   const m = location.hash.match(/skin=([A-Za-z0-9_-]+)/);
   if (m) {
     const c = await decodeSkin(m[1]);
     if (c) {
-      if (!customs.some((x) => x.id === c.id)) customs.push(c);
+      importedNew = !customs.some((x) => x.id === c.id);
+      if (importedNew) customs.push(c);
       store.set('dino.custom', customs);
       imported = c;
     }
@@ -76,8 +78,35 @@ let imported: CustomSkin | null = null;
   }
 }
 
-let currentId = imported?.id ?? store.get('dino.skin', 'original');
+// A ?skin=<id> link opens that skin (a preset, or a custom skin already saved here).
+const linked = new URLSearchParams(location.search).get('skin');
+let currentId = imported?.id ?? (linked && entries().some((e) => e.id === linked) ? linked : store.get('dino.skin', 'original'));
 if (!entries().some((e) => e.id === currentId)) currentId = 'original';
+store.set('dino.skin', currentId);
+
+// ---------------------------------------------------------------- links
+
+/** The link that opens a skin: ?skin=<id> for a preset; a custom skin travels whole in the hash. */
+async function skinUrl(id: string): Promise<string> {
+  const url = new URL(location.href);
+  const c = customs.find((x) => x.id === id);
+  if (c) {
+    url.searchParams.delete('skin');
+    url.hash = `skin=${await encodeSkin({ ...c, name: c.name.trim() || 'Untitled skin' })}`;
+  } else {
+    url.searchParams.set('skin', id);
+    url.hash = '';
+  }
+  return url.href;
+}
+
+/** Keeps the address bar on the skin being played, so it can be copied and shared as is. */
+let urlSeq = 0;
+async function syncUrl(id: string): Promise<void> {
+  const seq = ++urlSeq;
+  const href = await skinUrl(id);
+  if (seq === urlSeq && href !== location.href) history.replaceState(null, '', href);
+}
 
 // ---------------------------------------------------------------- game
 
@@ -210,6 +239,7 @@ function nowPlaying(a: SkinArt): void {
   $('skinTag').textContent = a.tagline;
   $('edit').hidden = !a.custom || designing;
   $('make').hidden = designing;
+  $('share').hidden = designing;
   for (const t of rail.querySelectorAll<HTMLElement>('.tile[data-id]')) t.setAttribute('aria-current', String(t.dataset.id === a.id));
 }
 
@@ -229,6 +259,7 @@ function setSkin(id: string, animate = true): void {
   if (id === currentId && id === game.art.id && !designing) return;
   currentId = id;
   store.set('dino.skin', id);
+  void syncUrl(id);
   const a = art(id);
   applySkin(a, animate);
   audio.play('switch', a.sound);
@@ -305,6 +336,7 @@ const designer = new Designer($('designer'), {
     closeDesigner();
     buildRail();
     setSkin(clean.id, false);
+    void syncUrl(clean.id);
     toast(`Saved ${clean.name}. It's in your skins now.`);
   },
   remove(id) {
@@ -356,6 +388,16 @@ function closeDesigner(): void {
 }
 
 $('make').addEventListener('click', () => openDesigner());
+$('share').addEventListener('click', async () => {
+  const url = await skinUrl(currentId);
+  try {
+    await navigator.clipboard.writeText(url);
+    toast(`Link to ${game.art.name} copied.`);
+  } catch {
+    // No clipboard access (an insecure page or a denied permission): the address bar has the same link.
+    toast('Copy the link from the address bar to share this skin.');
+  }
+});
 $('edit').addEventListener('click', () => {
   const c = customs.find((x) => x.id === currentId);
   if (c) openDesigner(c);
@@ -524,7 +566,8 @@ syncSound();
 layout();
 buildRail();
 applySkin(game.art, false);
-if (imported) toast(`Added ${imported.name} from a shared link.`);
+void syncUrl(currentId);
+if (imported && importedNew) toast(`Added ${imported.name} from a shared link.`);
 requestAnimationFrame((t) => {
   last = t;
   frame(t);
